@@ -33,6 +33,9 @@ def lambda_handler(event, context):
         # Convert to Date for mongo
         selected_fields_df['EVENT_START_LOCAL_DATE'] = pd.to_datetime(selected_fields_df['EVENT_START_LOCAL_DATE'], errors='coerce')
         
+        # Add CREATED_AT column
+        selected_fields_df['CREATED_AT'] = pd.Timestamp.now()
+
         # Fetch products already uploaded
         product_attraction_ids, product_event_ids = fetch_products()
 
@@ -42,7 +45,8 @@ def lambda_handler(event, context):
             ~selected_fields_df['EVENT_ID'].isin(product_event_ids)
         ]
 
-        filtered_selected_fields_df.columns = ['attractionId', 'attractionName', 'eventId', 'eventName', 'venueName', 'eventStartLocalDate']
+        filtered_selected_fields_df.columns = ['attractionId', 'attractionName', 'eventId', 
+                                               'eventName', 'venueName', 'eventStartLocalDate', 'createdAt']
         records_to_insert = filtered_selected_fields_df.to_dict(orient='records')
         insert_products(records_to_insert)
 
