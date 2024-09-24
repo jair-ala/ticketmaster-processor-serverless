@@ -30,6 +30,21 @@ functions:
       TICKETMASTER_BASE_URL: ${ssm:/ticketmaster/baseUrl}
       TARGET_BUCKET_NAME: ${self:custom.tkm_bucket}
       TARGET_BUCKET_FOLDER: feed/
+  forthcoming-events:
+    handler: functions/forthcoming_events.lambda_handler
+    package:
+      patterns:
+        - "functions/forthcoming_events.py"
+    events:
+      - s3:
+          bucket: ${self:custom.tkm_bucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: feed/
+            - suffix: .csv
+    role: TikcketMasterForthcomingEventsRole
+    environment:
+      MONGODB_URI_PRODUCT: ${ssm:/mongodb/product-db}
 
 resources:
   Resources:
@@ -60,4 +75,30 @@ resources:
                     - s3:PutObject
                     - s3:GetObjectTagging
                     - s3:PutObjectTagging
+                  Resource: arn:aws:s3:::${self:custom.tkm_bucket}/*
+
+    TikcketMasterForthcomingEventsRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: TikcketMasterForthcomingEventsRole
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        Policies:
+          - PolicyName: TikcketMasterForthcomingEventsRolePolicy
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                    - s3:GetObjectTagging
                   Resource: arn:aws:s3:::${self:custom.tkm_bucket}/*
