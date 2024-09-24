@@ -1,0 +1,63 @@
+service: ticketmaster-processor-serverless
+provider:
+  name: aws
+  runtime: python3.11
+  timeout: 30
+
+package:
+  individually: true
+  patterns:
+    - "!**/*"
+plugins:
+  - serverless-python-requirements
+custom:
+  tkm_bucket: ${env:TARGET_BUCKET_NAME, 'ticketmaster.lineup.dev'}
+  pythonRequirements:
+    dockerizePip: non-linux
+
+functions:
+  discovery-feed:
+    handler: functions/tkm_discovery_feed.lambda_handler
+    package:
+      patterns:
+        - "functions/tkm_discovery_feed.py"
+    events:
+      - schedule:
+          rate: cron(0 0,12 * * ? *)
+    role: TicketMasterDiscoverFeedRole
+    environment:
+      TICKETMASTER_API_KEY: ${ssm:/ticketmaster/apikey}
+      TICKETMASTER_BASE_URL: ${ssm:/ticketmaster/baseUrl}
+      TARGET_BUCKET_NAME: ${self:custom.tkm_bucket}
+      TARGET_BUCKET_FOLDER: feed/
+
+resources:
+  Resources:
+    TicketMasterDiscoverFeedRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: TicketMasterDiscoverFeedRole
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        Policies:
+          - PolicyName: TicketMasterDiscoverFeedRolePolicy
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                    - s3:DeleteObject
+                    - s3:PutObject
+                    - s3:GetObjectTagging
+                    - s3:PutObjectTagging
+                  Resource: arn:aws:s3:::${self:custom.tkm_bucket}/*
